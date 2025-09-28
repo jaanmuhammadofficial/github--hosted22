@@ -1,41 +1,36 @@
-name: Deploy Static Website (Docker)
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
 
-env:
-  REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-  REMOTE_USER: ${{ secrets.REMOTE_USER }}
-  REMOTE_PATH: /var/www/github--hosted22
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy project files to EC2
+      - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ env.REMOTE_HOST }}
-          username: ${{ env.REMOTE_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          source: "./*"
-          target: ${{ env.REMOTE_PATH }}
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "."
+          target: "~/github--hosted22"
 
-      - name: Deploy Docker container on EC2
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ env.REMOTE_HOST }}
-          username: ${{ env.REMOTE_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /var/www/github--hosted22
-            docker build -t blogcard .
+            cd ~/github--hosted22
             docker stop blogcard || true
             docker rm blogcard || true
+            docker build -t blogcard .
             docker run -d -p 8084:80 --name blogcard blogcard
