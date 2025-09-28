@@ -1,36 +1,24 @@
-name: CI/CD Pipeline
+name: CI Test
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:   # manually run karne ke liye
 
 jobs:
-  deploy:
+  ssh-test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@v0.1.7
+      - name: Test SSH connection
+        uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "."
-          target: "~/github--hosted22"
-
-      - name: Deploy on EC2
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: 22
           script: |
-            cd ~/github--hosted22
-            docker stop blogcard || true
-            docker rm blogcard || true
-            docker build -t blogcard .
-            docker run -d -p 8084:80 --name blogcard blogcard
+            echo "✅ SSH connection successful with jaanmuhammad key"
+            hostname
+            whoami
+            uptime
