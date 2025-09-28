@@ -23,7 +23,7 @@ jobs:
         with:
           host: ${{ env.REMOTE_HOST }}
           username: ${{ env.REMOTE_USER }}
-          key: ${{ secrets.AWS_SSH_KEY }}
+          key: ${{ secrets.VM_SSH_KEY }}
           source: "./*"
           target: ${{ env.REMOTE_PATH }}
 
@@ -32,14 +32,14 @@ jobs:
         with:
           host: ${{ env.REMOTE_HOST }}
           username: ${{ env.REMOTE_USER }}
-          key: ${{ secrets.AWS_SSH_KEY }}
+          key: ${{ secrets.VM_SSH_KEY }}
           script: |
             # Create Nginx config for port 8084
             sudo tee /etc/nginx/sites-available/github--hosted22 <<EOF
             server {
                 listen 8084;
                 server_name _;
-                root ${REMOTE_PATH};
+                root ${{ env.REMOTE_PATH }};
                 index index.html;
                 location / {
                     try_files \$uri \$uri/ =404;
@@ -47,9 +47,9 @@ jobs:
             }
             EOF
 
-            # Enable site
-            sudo ln -sf /etc/nginx/sites-available/github--hosted22 /etc/nginx/sites-enabled/
+            # Enable the site
+            sudo ln -sf /etc/nginx/sites-available/github--hosted22 /etc/nginx/sites-enabled/github--hosted22
 
-            # Test and reload
+            # Test Nginx config and restart
             sudo nginx -t
             sudo systemctl reload nginx
