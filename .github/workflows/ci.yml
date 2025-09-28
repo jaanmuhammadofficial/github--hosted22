@@ -8,7 +8,6 @@ on:
 env:
   REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
   REMOTE_USER: ${{ secrets.REMOTE_USER }}
-  REMOTE_PATH: /var/www/github--hosted22
 
 jobs:
   deploy:
@@ -18,22 +17,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 1: Debug SSH Connection
-      - name: Test SSH connection
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ env.REMOTE_HOST }}
-          username: ${{ env.REMOTE_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          port: 22
-          script: |
-            echo "✅ SSH Connected successfully!"
-            whoami
-            hostname
-            pwd
-
-      # Step 2: Copy Files to EC2
-      - name: Copy files to EC2
+      # Step 1: Copy files to EC2 (home directory, not /var/www directly)
+      - name: Copy files to EC2 (temp folder)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.REMOTE_HOST }}
@@ -41,10 +26,10 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           port: 22
           source: "."
-          target: ${{ env.REMOTE_PATH }}
+          target: "/home/ubuntu/app-temp"
 
-      # Step 3: Configure Nginx
-      - name: Configure Nginx for port 8084
+      # Step 2: Move files with sudo rights
+      - name: Move files to web directory
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ env.REMOTE_HOST }}
@@ -53,24 +38,6 @@ jobs:
           port: 22
           script: |
             sudo mkdir -p /var/www/github--hosted22
-            sudo chown -R ubuntu:ubuntu /var/www/github--hosted22
-
-            # Create Nginx config
-            sudo tee /etc/nginx/sites-available/github--hosted22 <<EOF
-            server {
-                listen 8084;
-                server_name _;
-                root /var/www/github--hosted22;
-
-                location / {
-                    index index.html;
-                    try_files \$uri \$uri/ =404;
-                }
-            }
-            EOF
-
-            # Enable site and reload nginx
-            sudo ln -sf /etc/nginx/sites-available/github--hosted22 /etc/nginx/sites-enabled/
-            sudo nginx -t
-            sudo systemctl reload nginx
-            echo "✅ Nginx configured successfully!"
+            sudo cp -r /home/ubuntu/app-temp/* /var/www/github--hosted22/
+            sudo chown -R www-data:www-data /var/www/github--hosted22
+            echo "✅ Deployment successful! Files are now in /var/www/github--hosted22"
