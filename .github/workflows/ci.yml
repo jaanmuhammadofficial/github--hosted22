@@ -1,0 +1,55 @@
+name: Deploy Static Website
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+  REMOTE_USER: ${{ secrets.REMOTE_USER }}
+  REMOTE_PATH: /var/www/github--hosted22  # repo-specific path
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.REMOTE_HOST }}
+          username: ${{ env.REMOTE_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          source: "./*"
+          target: ${{ env.REMOTE_PATH }}
+
+      - name: Configure Nginx for port 8084
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ env.REMOTE_HOST }}
+          username: ${{ env.REMOTE_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            # Create Nginx config for port 8084
+            sudo tee /etc/nginx/sites-available/github--hosted22 <<EOF
+            server {
+                listen 8084;
+                server_name _;
+                root ${REMOTE_PATH};
+                index index.html;
+                location / {
+                    try_files \$uri \$uri/ =404;
+                }
+            }
+            EOF
+
+            # Enable site
+            sudo ln -sf /etc/nginx/sites-available/github--hosted22 /etc/nginx/sites-enabled/
+
+            # Test and reload
+            sudo nginx -t
+            sudo systemctl reload nginx
