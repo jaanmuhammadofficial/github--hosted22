@@ -1,4 +1,4 @@
-name: Deploy Static Website via Docker
+name: Deploy Static Website (Docker)
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 env:
   REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
   REMOTE_USER: ${{ secrets.REMOTE_USER }}
+  REMOTE_PATH: /var/www/github--hosted22
 
 jobs:
   deploy:
@@ -17,18 +18,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Copy project files to VM
-      - name: Copy files to VM
+      - name: Copy project files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.REMOTE_HOST }}
           username: ${{ env.REMOTE_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           source: "./*"
-          target: "/var/www/github--hosted22"
+          target: ${{ env.REMOTE_PATH }}
 
-      # SSH into VM and build/run Docker container
-      - name: Build and Run Docker container
+      - name: Deploy Docker container on EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ env.REMOTE_HOST }}
@@ -36,23 +35,7 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             cd /var/www/github--hosted22
-
-            # Create Dockerfile if not exists
-            if [ ! -f Dockerfile ]; then
-              cat <<EOF > Dockerfile
-              FROM nginx:alpine
-              COPY . /usr/share/nginx/html
-              EXPOSE 80
-              CMD ["nginx", "-g", "daemon off;"]
-              EOF
-            fi
-
-            # Build Docker image
             docker build -t blogcard .
-
-            # Stop & remove old container if running
             docker stop blogcard || true
             docker rm blogcard || true
-
-            # Run new container mapping host 8084 -> container 80
             docker run -d -p 8084:80 --name blogcard blogcard
