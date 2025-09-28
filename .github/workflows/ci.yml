@@ -1,16 +1,19 @@
-name: CI Test
+name: CI/CD Pipeline
 
 on:
-  workflow_dispatch:   # manually run karne ke liye
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  ssh-test:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Test SSH connection
+      - name: Deploy to EC2 with Docker
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.REMOTE_HOST }}
@@ -18,7 +21,16 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           port: 22
           script: |
-            echo "✅ SSH connection successful with jaanmuhammad key"
-            hostname
-            whoami
-            uptime
+            cd ~/github--hosted22 || mkdir -p ~/github--hosted22 && cd ~/github--hosted22
+            git pull || true
+
+            echo "🛠 Building Docker image..."
+            docker build -t blogcard .
+
+            echo "🛑 Removing old container (if exists)..."
+            docker rm -f blogcard || true
+
+            echo "🚀 Running new container on port 8084..."
+            docker run -d -p 8084:80 --name blogcard blogcard
+
+            echo "✅ Deployment successful! Visit: http://${{ secrets.REMOTE_HOST }}:8084"
