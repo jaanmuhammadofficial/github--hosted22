@@ -6,7 +6,9 @@ on:
       - main
 
 env:
-  REMOTE_PATH: /var/www/github--hosted22  # repo-specific path
+  REMOTE_HOST: ${{ secrets.REMOTE_HOST }}   # e.g. 3.94.162.146
+  REMOTE_USER: ${{ secrets.REMOTE_USER }}   # e.g. ubuntu
+  REMOTE_PATH: /var/www/github--hosted22
 
 jobs:
   deploy:
@@ -16,23 +18,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Ensure target folder exists
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ env.REMOTE_HOST }}
+          username: ${{ env.REMOTE_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            sudo mkdir -p ${{ env.REMOTE_PATH }}
+            sudo chown -R $USER:$USER ${{ env.REMOTE_PATH }}
+
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
+          host: ${{ env.REMOTE_HOST }}
+          username: ${{ env.REMOTE_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
           source: "./*"
           target: ${{ env.REMOTE_PATH }}
 
       - name: Configure Nginx for port 8084
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
+          host: ${{ env.REMOTE_HOST }}
+          username: ${{ env.REMOTE_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
           script: |
-            # Create Nginx config for port 8084
             sudo tee /etc/nginx/sites-available/github--hosted22 <<EOF
             server {
                 listen 8084;
@@ -45,9 +56,7 @@ jobs:
             }
             EOF
 
-            # Enable the site
-            sudo ln -sf /etc/nginx/sites-available/github--hosted22 /etc/nginx/sites-enabled/github--hosted22
-
-            # Test and reload Nginx
+            sudo ln -sf /etc/nginx/sites-available/github--hosted22 /etc/nginx/sites-enabled/
             sudo nginx -t
             sudo systemctl reload nginx
+
